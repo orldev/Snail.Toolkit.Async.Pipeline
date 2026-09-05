@@ -1,0 +1,28 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Snail.Toolkit.Async.Pipeline", "src\Snail.Toolkit.Async.Pipeline.csproj", "{41A1B3E5-8FDF-4FDC-9F97-000666F399BE}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Snail.Toolkit.Async.Pipeline.Tests", "tests\Snail.Toolkit.Async.Pipeline.Tests.csproj", "{51988884-6354-49A5-984E-DC333ED32576}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Snail.Toolkit.Async.Pipeline.Benchmarks", "benchmarks\Snail.Toolkit.Async.Pipeline.Benchmarks.csproj", "{6D76CC4A-BCF2-477C-B3FF-0287679EFAE2}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{41A1B3E5-8FDF-4FDC-9F97-000666F399BE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{41A1B3E5-8FDF-4FDC-9F97-000666F399BE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{41A1B3E5-8FDF-4FDC-9F97-000666F399BE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{41A1B3E5-8FDF-4FDC-9F97-000666F399BE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{51988884-6354-49A5-984E-DC333ED32576}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{51988884-6354-49A5-984E-DC333ED32576}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{51988884-6354-49A5-984E-DC333ED32576}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{51988884-6354-49A5-984E-DC333ED32576}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6D76CC4A-BCF2-477C-B3FF-0287679EFAE2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6D76CC4A-BCF2-477C-B3FF-0287679EFAE2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6D76CC4A-BCF2-477C-B3FF-0287679EFAE2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6D76CC4A-BCF2-477C-B3FF-0287679EFAE2}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
