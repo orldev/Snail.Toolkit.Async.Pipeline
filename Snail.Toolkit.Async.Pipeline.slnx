@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="benchmarks/Snail.Toolkit.Async.Pipeline.Benchmarks.csproj" />
+  <Project Path="src/Snail.Toolkit.Async.Pipeline.csproj" />
+  <Project Path="tests/Snail.Toolkit.Async.Pipeline.NativeProbe/Snail.Toolkit.Async.Pipeline.NativeProbe.csproj" />
+  <Project Path="tests/Snail.Toolkit.Async.Pipeline.Tests.csproj" />
+</Solution>

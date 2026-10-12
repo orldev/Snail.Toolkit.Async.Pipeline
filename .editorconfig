@@ -1,3 +1,8 @@
+# The shared .editorconfig of every Snail library and server built on Snail.Sdk: copied byte for byte, checked by the
+# conformance check. Formatting only. The rules — which style is required, which analyzer fails the build, what a test
+# project is spared — ship in the Snail.Sdk package and change with its version, not with a copy of this file. A
+# repository not yet on Snail.Sdk keeps version 1 of this file, which carried the rules. See docs/standard.md.
+
 root = true
 
 [*]
@@ -8,95 +13,8 @@ trim_trailing_whitespace = true
 indent_style = space
 indent_size = 4
 
-[*.{json,yml,yaml,props,targets,csproj}]
+[*.{csproj,props,targets,slnx,xml,yml,yaml,json,toml}]
 indent_size = 2
 
-[*.cs]
-indent_size = 4
-max_line_length = 120
-
-# Namespaces and usings
-csharp_style_namespace_declarations = file_scoped:warning
-dotnet_sort_system_directives_first = true
-dotnet_separate_import_directive_groups = false
-
-# "Smart use of var": only where the type is obvious from the right-hand side.
-# The rule is "var only where the type is obvious from the right-hand side", which is a judgement
-# about readability. IDE0008 cannot make it: it treats every factory call as non-apparent and would
-# demand an explicit type for Channel.CreateBounded<T>(). Kept as a preference, not as a warning.
-csharp_style_var_when_type_is_apparent = true:silent
-csharp_style_var_for_built_in_types = false:silent
-csharp_style_var_elsewhere = false:silent
-
-# Expression-bodied members for simple getters, properties and one-line methods.
-csharp_style_expression_bodied_methods = when_on_single_line:suggestion
-csharp_style_expression_bodied_properties = true:warning
-csharp_style_expression_bodied_accessors = true:warning
-csharp_style_expression_bodied_indexers = true:warning
-csharp_style_expression_bodied_lambdas = true:warning
-
-# Collection expressions: [] and [.. items].
-dotnet_style_collection_initializer = true:warning
-dotnet_style_prefer_collection_expression = true:warning
-
-# Flat structure: guard clauses, early returns, no arrow code.
-csharp_prefer_braces = when_multiline:suggestion
-csharp_style_prefer_pattern_matching = true:warning
-csharp_style_prefer_not_pattern = true:warning
-dotnet_style_prefer_conditional_expression_over_return = false
-
-# Clean string handling: interpolation only, comparisons state their StringComparison.
-dotnet_style_prefer_simplified_interpolation = true:warning
-dotnet_diagnostic.CA1307.severity = warning
-dotnet_diagnostic.CA1310.severity = warning
-dotnet_diagnostic.CA1311.severity = warning
-
-# Modern syntax.
-csharp_style_prefer_primary_constructors = true:suggestion
-csharp_style_prefer_range_operator = true:warning
-csharp_style_prefer_index_operator = true:warning
-csharp_prefer_simple_using_statement = true:warning
-csharp_style_prefer_top_level_statements = false
-
-# Naming: no data types in names, no pattern names, no abbreviations.
-dotnet_diagnostic.CA1725.severity = warning
-dotnet_diagnostic.CA1716.severity = warning
-
-# Asynchrony: async methods end in Async, take a CancellationToken and pass it on.
-# CA2007 stays on for the library: every await in library code configures itself.
-dotnet_diagnostic.CA2007.severity = warning
-dotnet_diagnostic.CA1849.severity = warning
-dotnet_diagnostic.CA2016.severity = warning
-dotnet_diagnostic.CA2012.severity = warning
-dotnet_diagnostic.CA1068.severity = warning
-
-# Every public member carries XML documentation; CS1591 is not suppressed.
-dotnet_diagnostic.CS1591.severity = warning
-
-# Types: sealed by default.
-dotnet_diagnostic.CA1852.severity = warning
-
-# A pump that carries a stream's failure to its consumer must catch everything it is handed: narrowing
-# the catch is exactly the defect that let exceptions vanish and elements disappear. The intent is
-# stated in the <remarks> of each such method.
-dotnet_diagnostic.CA1031.severity = none
-
-# CA1034 does not know C# 14 extension blocks and reads them as a nested type.
-dotnet_diagnostic.CA1034.severity = none
-
-[tests/**.cs]
-# Tests are named Subject_Condition_ExpectedResult, so underscores are the convention here,
-# not a defect. This overrides CA1707, which knows nothing about that rule.
-dotnet_diagnostic.CA1707.severity = none
-
-# A test is not library code: it owns its synchronisation context and its literals.
-dotnet_diagnostic.CA2007.severity = none
-dotnet_diagnostic.CA1861.severity = none
-dotnet_diagnostic.CS1591.severity = none
-
-# CA2025 cannot see that the pump is awaited before the token source is disposed: every iterator here
-# cancels and then awaits its background work inside a finally that runs before the `using` scope ends.
-# That ordering is the guarantee the operators exist to provide, and it is asserted by the
-# WhenConsumerBreaksEarly tests rather than left to the analyzer.
-[src/**.cs]
-dotnet_diagnostic.CA2025.severity = none
+[*.md]
+trim_trailing_whitespace = false

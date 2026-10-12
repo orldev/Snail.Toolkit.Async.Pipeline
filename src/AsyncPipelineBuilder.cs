@@ -36,7 +36,7 @@ public static class AsyncPipelineBuilder
     {
         ArgumentNullException.ThrowIfNull(source);
 
-        return new AsyncPipeline<T>(Awaited(source));
+        return new AsyncPipeline<T>(AwaitedAsync(source));
     }
 
     /// <summary>Wraps a single value that is still being produced.</summary>
@@ -51,7 +51,7 @@ public static class AsyncPipelineBuilder
     {
         ArgumentNullException.ThrowIfNull(source);
 
-        return new AsyncPipeline<T>(Single<T>(_ => source()));
+        return new AsyncPipeline<T>(SingleAsync<T>(_ => source()));
     }
 
     /// <summary>Wraps a single value that is still being produced, cancelled with the enumeration.</summary>
@@ -60,7 +60,7 @@ public static class AsyncPipelineBuilder
     {
         ArgumentNullException.ThrowIfNull(source);
 
-        return new AsyncPipeline<T>(Single(source));
+        return new AsyncPipeline<T>(SingleAsync(source));
     }
 
     /// <summary>Reads every source at once and yields elements as they arrive.</summary>
@@ -76,7 +76,7 @@ public static class AsyncPipelineBuilder
         foreach (var source in sources)
             ArgumentNullException.ThrowIfNull(source);
 
-        return new AsyncPipeline<T>(Merged(sources));
+        return new AsyncPipeline<T>(MergedAsync(sources));
     }
 
     /// <summary>Reads the sources one after another, in the order given.</summary>
@@ -87,7 +87,7 @@ public static class AsyncPipelineBuilder
         foreach (var source in sources)
             ArgumentNullException.ThrowIfNull(source);
 
-        return new AsyncPipeline<T>(Concatenated(sources));
+        return new AsyncPipeline<T>(ConcatenatedAsync(sources));
     }
 
     /// <remarks>
@@ -95,7 +95,7 @@ public static class AsyncPipelineBuilder
     /// this pipeline waiting on it, which is why the token goes to <c>WaitAsync</c> rather than being
     /// ignored as a task nobody here owns.
     /// </remarks>
-    private static async IAsyncEnumerable<T> Awaited<T>(
+    private static async IAsyncEnumerable<T> AwaitedAsync<T>(
         Task<IEnumerable<T>> source,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
@@ -109,14 +109,14 @@ public static class AsyncPipelineBuilder
         }
     }
 
-    private static async IAsyncEnumerable<T> Single<T>(
+    private static async IAsyncEnumerable<T> SingleAsync<T>(
         Func<CancellationToken, ValueTask<T>> source,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         yield return await source(cancellationToken).ConfigureAwait(false);
     }
 
-    private static async IAsyncEnumerable<T> Merged<T>(
+    private static async IAsyncEnumerable<T> MergedAsync<T>(
         IAsyncEnumerable<T>[] sources,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
@@ -180,7 +180,7 @@ public static class AsyncPipelineBuilder
         }
     }
 
-    private static async IAsyncEnumerable<T> Concatenated<T>(
+    private static async IAsyncEnumerable<T> ConcatenatedAsync<T>(
         IAsyncEnumerable<T>[] sources,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {

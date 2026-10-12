@@ -1,0 +1,15 @@
+<Project Sdk="Snail.Sdk">
+
+  <!--
+    The library in a native app: IsAotCompatible sees warnings only, and a library can be clean and still compute
+    nothing under Native AOT. The shared CI publishes this probe with Native AOT and runs it; it must exit 0.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Snail.Toolkit.Async.Pipeline.csproj" />
+  </ItemGroup>
+
+</Project>

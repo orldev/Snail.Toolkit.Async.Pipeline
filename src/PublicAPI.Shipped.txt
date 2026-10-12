@@ -1,0 +1,44 @@
+#nullable enable
+Snail.Toolkit.Async.Pipeline.AsyncPipeline<T>
+Snail.Toolkit.Async.Pipeline.AsyncPipeline<T>.AggregateAsync(System.Func<T, T, T>! func, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<T>
+Snail.Toolkit.Async.Pipeline.AsyncPipeline<T>.AggregateAsync<TResult>(TResult seed, System.Func<TResult, T, TResult>! func, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<TResult>
+Snail.Toolkit.Async.Pipeline.AsyncPipeline<T>.AnyAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<bool>
+Snail.Toolkit.Async.Pipeline.AsyncPipeline<T>.AsAsyncEnumerable() -> System.Collections.Generic.IAsyncEnumerable<T>!
+Snail.Toolkit.Async.Pipeline.AsyncPipeline<T>.AsyncPipeline(System.Collections.Generic.IAsyncEnumerable<T>! source) -> void
+Snail.Toolkit.Async.Pipeline.AsyncPipeline<T>.Concat(System.Collections.Generic.IAsyncEnumerable<T>! other) -> Snail.Toolkit.Async.Pipeline.AsyncPipeline<T>!
+Snail.Toolkit.Async.Pipeline.AsyncPipeline<T>.CountAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<int>
+Snail.Toolkit.Async.Pipeline.AsyncPipeline<T>.Distinct() -> Snail.Toolkit.Async.Pipeline.AsyncPipeline<T>!
+Snail.Toolkit.Async.Pipeline.AsyncPipeline<T>.FirstAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<T>
+Snail.Toolkit.Async.Pipeline.AsyncPipeline<T>.FirstOrDefaultAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<T?>
+Snail.Toolkit.Async.Pipeline.AsyncPipeline<T>.GetAsyncEnumerator(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Collections.Generic.IAsyncEnumerator<T>!
+Snail.Toolkit.Async.Pipeline.AsyncPipeline<T>.GroupBy<TKey>(System.Func<T, TKey>! keySelector) -> Snail.Toolkit.Async.Pipeline.AsyncPipeline<System.Linq.IGrouping<TKey, T>!>!
+Snail.Toolkit.Async.Pipeline.AsyncPipeline<T>.Merge(System.Collections.Generic.IAsyncEnumerable<T>! other) -> Snail.Toolkit.Async.Pipeline.AsyncPipeline<T>!
+Snail.Toolkit.Async.Pipeline.AsyncPipeline<T>.Select<TResult>(System.Func<T, System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<TResult>>! selector, int maxDegreeOfParallelism) -> Snail.Toolkit.Async.Pipeline.AsyncPipeline<TResult>!
+Snail.Toolkit.Async.Pipeline.AsyncPipeline<T>.Select<TResult>(System.Func<T, TResult>! selector) -> Snail.Toolkit.Async.Pipeline.AsyncPipeline<TResult>!
+Snail.Toolkit.Async.Pipeline.AsyncPipeline<T>.SelectMany<TResult>(System.Func<T, System.Collections.Generic.IAsyncEnumerable<TResult>!>! selector) -> Snail.Toolkit.Async.Pipeline.AsyncPipeline<TResult>!
+Snail.Toolkit.Async.Pipeline.AsyncPipeline<T>.SelectMany<TResult>(System.Func<T, System.Collections.Generic.IEnumerable<TResult>!>! selector) -> Snail.Toolkit.Async.Pipeline.AsyncPipeline<TResult>!
+Snail.Toolkit.Async.Pipeline.AsyncPipeline<T>.SelectMany<TResult>(System.Func<T, System.Threading.CancellationToken, System.Collections.Generic.IAsyncEnumerable<TResult>!>! selector, int maxDegreeOfParallelism) -> Snail.Toolkit.Async.Pipeline.AsyncPipeline<TResult>!
+Snail.Toolkit.Async.Pipeline.AsyncPipeline<T>.SelectUnordered<TResult>(System.Func<T, System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<TResult>>! selector, int maxDegreeOfParallelism) -> Snail.Toolkit.Async.Pipeline.AsyncPipeline<TResult>!
+Snail.Toolkit.Async.Pipeline.AsyncPipeline<T>.Skip(int count) -> Snail.Toolkit.Async.Pipeline.AsyncPipeline<T>!
+Snail.Toolkit.Async.Pipeline.AsyncPipeline<T>.Take(int count) -> Snail.Toolkit.Async.Pipeline.AsyncPipeline<T>!
+Snail.Toolkit.Async.Pipeline.AsyncPipeline<T>.ToArrayAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<T[]!>
+Snail.Toolkit.Async.Pipeline.AsyncPipeline<T>.ToDictionaryAsync<TKey>(System.Func<T, TKey>! keySelector, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<System.Collections.Generic.Dictionary<TKey, T>!>
+Snail.Toolkit.Async.Pipeline.AsyncPipeline<T>.ToListAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<System.Collections.Generic.List<T>!>
+Snail.Toolkit.Async.Pipeline.AsyncPipeline<T>.Where(System.Func<T, System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<bool>>! predicate, int maxDegreeOfParallelism) -> Snail.Toolkit.Async.Pipeline.AsyncPipeline<T>!
+Snail.Toolkit.Async.Pipeline.AsyncPipeline<T>.Where(System.Func<T, bool>! predicate) -> Snail.Toolkit.Async.Pipeline.AsyncPipeline<T>!
+Snail.Toolkit.Async.Pipeline.AsyncPipeline<T>.WithCancellation(System.Threading.CancellationToken cancellationToken) -> System.Runtime.CompilerServices.ConfiguredCancelableAsyncEnumerable<T>
+Snail.Toolkit.Async.Pipeline.AsyncPipelineBuilder
+Snail.Toolkit.Async.Pipeline.AsyncPipelineExtensions
+Snail.Toolkit.Async.Pipeline.AsyncPipelineExtensions.extension<T>(System.Collections.Generic.IAsyncEnumerable<T>!)
+Snail.Toolkit.Async.Pipeline.AsyncPipelineExtensions.extension<T>(System.Collections.Generic.IAsyncEnumerable<T>!).ToPipeline() -> Snail.Toolkit.Async.Pipeline.AsyncPipeline<T>!
+Snail.Toolkit.Async.Pipeline.AsyncPipelineExtensions.extension<T>(System.Collections.Generic.IEnumerable<T>!)
+Snail.Toolkit.Async.Pipeline.AsyncPipelineExtensions.extension<T>(System.Collections.Generic.IEnumerable<T>!).ToPipeline() -> Snail.Toolkit.Async.Pipeline.AsyncPipeline<T>!
+static Snail.Toolkit.Async.Pipeline.AsyncPipelineBuilder.Concat<T>(params System.Collections.Generic.IAsyncEnumerable<T>![]! sources) -> Snail.Toolkit.Async.Pipeline.AsyncPipeline<T>!
+static Snail.Toolkit.Async.Pipeline.AsyncPipelineBuilder.From<T>(System.Collections.Generic.IAsyncEnumerable<T>! source) -> Snail.Toolkit.Async.Pipeline.AsyncPipeline<T>!
+static Snail.Toolkit.Async.Pipeline.AsyncPipelineBuilder.From<T>(System.Collections.Generic.IEnumerable<T>! source) -> Snail.Toolkit.Async.Pipeline.AsyncPipeline<T>!
+static Snail.Toolkit.Async.Pipeline.AsyncPipelineBuilder.From<T>(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<T>>! source) -> Snail.Toolkit.Async.Pipeline.AsyncPipeline<T>!
+static Snail.Toolkit.Async.Pipeline.AsyncPipelineBuilder.From<T>(System.Func<System.Threading.Tasks.ValueTask<T>>! source) -> Snail.Toolkit.Async.Pipeline.AsyncPipeline<T>!
+static Snail.Toolkit.Async.Pipeline.AsyncPipelineBuilder.From<T>(System.Threading.Tasks.Task<System.Collections.Generic.IEnumerable<T>!>! source) -> Snail.Toolkit.Async.Pipeline.AsyncPipeline<T>!
+static Snail.Toolkit.Async.Pipeline.AsyncPipelineBuilder.Merge<T>(params System.Collections.Generic.IAsyncEnumerable<T>![]! sources) -> Snail.Toolkit.Async.Pipeline.AsyncPipeline<T>!
+static Snail.Toolkit.Async.Pipeline.AsyncPipelineExtensions.ToPipeline<T>(this System.Collections.Generic.IAsyncEnumerable<T>! source) -> Snail.Toolkit.Async.Pipeline.AsyncPipeline<T>!
+static Snail.Toolkit.Async.Pipeline.AsyncPipelineExtensions.ToPipeline<T>(this System.Collections.Generic.IEnumerable<T>! source) -> Snail.Toolkit.Async.Pipeline.AsyncPipeline<T>!

@@ -27,7 +27,7 @@ namespace Snail.Toolkit.Async.Pipeline;
 internal static class Concurrent
 {
     /// <summary>Projects each element concurrently and yields the results in source order.</summary>
-    internal static async IAsyncEnumerable<TResult> Ordered<T, TResult>(
+    internal static async IAsyncEnumerable<TResult> OrderedAsync<T, TResult>(
         IAsyncEnumerable<T> source,
         Func<T, CancellationToken, ValueTask<TResult>> selector,
         int degree,
@@ -60,7 +60,7 @@ internal static class Concurrent
         Func<T, CancellationToken, ValueTask<TResult>> selector,
         int degree,
         CancellationToken cancellationToken = default) =>
-        FanOut<T, TResult>(
+        FanOutAsync<T, TResult>(
             source,
             async (item, results, token) =>
                 await results.WriteAsync(await selector(item, token).ConfigureAwait(false), token)
@@ -74,7 +74,7 @@ internal static class Concurrent
         Func<T, CancellationToken, IAsyncEnumerable<TResult>> selector,
         int degree,
         CancellationToken cancellationToken = default) =>
-        FanOut<T, TResult>(
+        FanOutAsync<T, TResult>(
             source,
             async (item, results, token) =>
             {
@@ -85,13 +85,13 @@ internal static class Concurrent
             cancellationToken);
 
     /// <summary>Tests each element concurrently and yields the matches in source order.</summary>
-    internal static async IAsyncEnumerable<T> Filtered<T>(
+    internal static async IAsyncEnumerable<T> FilteredAsync<T>(
         IAsyncEnumerable<T> source,
         Func<T, CancellationToken, ValueTask<bool>> predicate,
         int degree,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        var judged = Ordered(
+        var judged = OrderedAsync(
             source,
             async (item, token) => (Item: item, IsMatch: await predicate(item, token).ConfigureAwait(false)),
             degree,
@@ -104,7 +104,7 @@ internal static class Concurrent
         }
     }
 
-    private static async IAsyncEnumerable<TResult> FanOut<T, TResult>(
+    private static async IAsyncEnumerable<TResult> FanOutAsync<T, TResult>(
         IAsyncEnumerable<T> source,
         Func<T, ChannelWriter<TResult>, CancellationToken, ValueTask> body,
         int degree,
@@ -161,7 +161,7 @@ internal static class Concurrent
         try
         {
             await foreach (var item in source.WithCancellation(cancellationToken).ConfigureAwait(false))
-                await started.WriteAsync(Invoke(item, selector, cancellationToken), cancellationToken)
+                await started.WriteAsync(InvokeAsync(item, selector, cancellationToken), cancellationToken)
                     .ConfigureAwait(false);
 
             started.TryComplete();
@@ -172,7 +172,7 @@ internal static class Concurrent
         }
     }
 
-    private static async Task<TResult> Invoke<T, TResult>(
+    private static async Task<TResult> InvokeAsync<T, TResult>(
         T item,
         Func<T, CancellationToken, ValueTask<TResult>> selector,
         CancellationToken cancellationToken) =>
@@ -253,7 +253,6 @@ internal static class Concurrent
         }
         catch (Exception)
         {
-            // ignored
         }
     }
 }

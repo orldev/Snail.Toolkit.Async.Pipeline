@@ -1,21 +1,15 @@
-<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Snail.Sdk.Library">
 
     <PropertyGroup>
         <TargetFramework>net10.0</TargetFramework>
-        <Nullable>enable</Nullable>
-        <ImplicitUsings>enable</ImplicitUsings>
-        <GenerateDocumentationFile>true</GenerateDocumentationFile>
         <PackageId>Snail.Toolkit.Async.Pipeline</PackageId>
         <Title>Snail.Toolkit.Async.Pipeline</Title>
         <Description>Fluent operators over IAsyncEnumerable with bounded, cancellable parallelism.</Description>
         <PackageTags>async;iasyncenumerable;streaming;parallelism;channels</PackageTags>
-        <PackageReadmeFile>README.md</PackageReadmeFile>
         <Authors>Toolkit</Authors>
         <RepositoryUrl>https://github.com/orldev/Snail.Toolkit.Async.Pipeline</RepositoryUrl>
         <PackageProjectUrl>https://github.com/orldev/Snail.Toolkit.Async.Pipeline</PackageProjectUrl>
         <Copyright>Toolkit, 2023</Copyright>
-        <RepositoryType>git</RepositoryType>
-        <PublishRepositoryUrl>true</PublishRepositoryUrl>
         <PackageReadmeFile>README.md</PackageReadmeFile>
         <PackageLicenseExpression>MIT</PackageLicenseExpression>
     </PropertyGroup>

@@ -17,7 +17,7 @@ public sealed partial class AsyncPipeline<T>
         ArgumentNullException.ThrowIfNull(selector);
         ArgumentOutOfRangeException.ThrowIfLessThan(maxDegreeOfParallelism, 1);
 
-        return new AsyncPipeline<TResult>(Concurrent.Ordered(source, selector, maxDegreeOfParallelism));
+        return new AsyncPipeline<TResult>(Concurrent.OrderedAsync(source, selector, maxDegreeOfParallelism));
     }
 
     /// <summary>Projects each element concurrently, yielding each result as soon as it is ready.</summary>
@@ -47,7 +47,7 @@ public sealed partial class AsyncPipeline<T>
         ArgumentNullException.ThrowIfNull(predicate);
         ArgumentOutOfRangeException.ThrowIfLessThan(maxDegreeOfParallelism, 1);
 
-        return new AsyncPipeline<T>(Concurrent.Filtered(source, predicate, maxDegreeOfParallelism));
+        return new AsyncPipeline<T>(Concurrent.FilteredAsync(source, predicate, maxDegreeOfParallelism));
     }
 
     /// <summary>Expands each element into a sub-sequence concurrently and interleaves the results.</summary>
