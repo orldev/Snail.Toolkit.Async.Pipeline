@@ -105,8 +105,14 @@ dotnet run -c Release --project benchmarks -- --filter '*'
 `AbandonedAfterAPrefix` reads a fixed prefix and leaves. Read the `Allocated` column down: it must stay
 flat as the source grows from ten thousand elements to a hundred thousand, because the results channel
 holds at most `maxDegreeOfParallelism` of them and a consumer that stops reading stops the source.
-`DrainedToTheEnd` beside it consumes everything and is expected to grow. A flat line next to a growing
-one is what the bound looks like when it holds.
+`DrainedToTheEnd` beside it consumes everything: it may grow only by what the selector itself allocates,
+and with the selector there, which answers at once, the operator allocates nothing per element, so it
+stays flat too. A line that grows with the source is the bound broken.
+
+`InOrder` and `AsTheyComplete` measure what each element costs the parallel operators, those that keep
+the source order and those that answer as calls complete, with calls that answer at once and calls
+that yield first. Each checks its operators' answers in its setup, and `benchmarks/baseline/` keeps the
+last run.
 
 ## License
 

@@ -13,3 +13,8 @@ permissions:
 jobs:
   perf:
     uses: orldev/Snail.Sdk/.github/workflows/perf.yml@v1
+    # Merge and the unordered operators have several writers on one channel: how often a writer finds the channel full,
+    # and so allocates a wait, depends on the scheduler, and their bytes move by about ten percent between runs of the
+    # same code. The ordered operators stay flat; the tolerance is for the many-writer ones.
+    with:
+      allocation-tolerance: 15

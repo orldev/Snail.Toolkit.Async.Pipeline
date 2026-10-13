@@ -11,9 +11,9 @@ namespace Snail.Toolkit.Async.Pipeline.Benchmarks;
 /// Read the Allocated column down, not the Mean column across. <see cref="AbandonedAfterAPrefix"/> reads
 /// a fixed prefix and leaves; its allocation must stay flat as <see cref="SourceLength"/> grows tenfold,
 /// because the results channel holds at most <see cref="Degree"/> of them and a consumer that stops
-/// reading stops the source. <see cref="DrainedToTheEnd"/> is the contrast: it consumes everything, so
-/// its allocation is expected to grow with the source. A flat line beside a growing one is what the
-/// bound looks like when it holds.
+/// reading stops the source. <see cref="DrainedToTheEnd"/> consumes everything, so it may grow only by
+/// what the selector allocates; this selector answers at once and the operator allocates nothing per
+/// element, so it stays flat as well. A line that grows with the source is the bound broken.
 /// </para>
 /// <para>
 /// The defect this guards against measured 100000 elements read out of a 100000-element source at a

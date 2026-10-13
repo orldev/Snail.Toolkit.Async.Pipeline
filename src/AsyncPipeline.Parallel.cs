@@ -7,6 +7,11 @@ public sealed partial class AsyncPipeline<T>
     /// <paramref name="maxDegreeOfParallelism"/> bounds both the concurrent calls and the results held
     /// in memory, so a slow consumer stops the source from being read. Ordering costs latency: a slow
     /// element delays the ones behind it. Use <see cref="SelectUnordered{TResult}"/> when order is free.
+    /// <para>
+    /// Each <see cref="ValueTask{TResult}"/> the selector returns is awaited exactly once, but not at once: it is
+    /// held until the consumer reaches its element. A selector must not return value tasks backed by one reused
+    /// source, which was never safe above a degree of one.
+    /// </para>
     /// </remarks>
     /// <exception cref="ArgumentNullException"><paramref name="selector"/> is null.</exception>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="maxDegreeOfParallelism"/> is below one.</exception>
