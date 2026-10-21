@@ -55,25 +55,15 @@ internal static class Concurrent
     internal static IAsyncEnumerable<TResult> Unordered<T, TResult>(
         IAsyncEnumerable<T> source,
         Func<T, CancellationToken, ValueTask<TResult>> selector,
-        int degree,
-        CancellationToken cancellationToken = default) =>
-        FanOutAsync<T, TResult>(
-            source,
-            (pending, results, stop) => ProjectAsync(pending, results, selector, stop),
-            degree,
-            cancellationToken);
+        int degree) =>
+        FanOutAsync<T, TResult>(source, (crew, results, stop) => ProjectAsync(crew, results, selector, stop), degree);
 
     /// <summary>Expands each element into a sub-sequence concurrently and interleaves the results.</summary>
     internal static IAsyncEnumerable<TResult> Flattened<T, TResult>(
         IAsyncEnumerable<T> source,
         Func<T, CancellationToken, IAsyncEnumerable<TResult>> selector,
-        int degree,
-        CancellationToken cancellationToken = default) =>
-        FanOutAsync<T, TResult>(
-            source,
-            (pending, results, stop) => ExpandAsync(pending, results, selector, stop),
-            degree,
-            cancellationToken);
+        int degree) =>
+        FanOutAsync<T, TResult>(source, (crew, results, stop) => ExpandAsync(crew, results, selector, stop), degree);
 
     /// <summary>Starts a call on each element in source order, at most <paramref name="degree"/> at once, and yields each element with its answer.</summary>
     /// <remarks>
@@ -139,7 +129,7 @@ internal static class Concurrent
 
     private static async IAsyncEnumerable<TResult> FanOutAsync<T, TResult>(
         IAsyncEnumerable<T> source,
-        Func<ChannelReader<T>, ChannelWriter<TResult>, Stop, Task> consume,
+        Func<Crew<T>, ChannelWriter<TResult>, Stop, Task> consume,
         int degree,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
@@ -147,6 +137,7 @@ internal static class Concurrent
         var results = Channel.CreateBounded<TResult>(degree);
 
         using var stop = new Stop(cancellationToken);
+        var crew = new Crew<T>(pending.Reader, degree, Work);
         var run = RunAsync();
 
         try
@@ -164,13 +155,10 @@ internal static class Concurrent
 
         async Task RunAsync()
         {
-            var running = new Task[degree + 1];
-            for (int i = 0; i < degree; i++)
-                running[i] = consume(pending.Reader, results.Writer, stop);
+            var feeding = FeedAsync(source, pending.Writer, stop, crew.Reinforce);
+            await ObserveAsync(feeding).ConfigureAwait(false);
 
-            running[degree] = FeedAsync(source, pending.Writer, stop);
-
-            var all = Task.WhenAll(running);
+            var all = Task.WhenAll([feeding, .. crew.Workers]);
 
             try
             {
@@ -183,6 +171,8 @@ internal static class Concurrent
                 results.Writer.TryComplete(Failure(all, stop.Cause));
             }
         }
+
+        Task Work(Crew<T> workers) => consume(workers, results.Writer, stop);
     }
 
     /// <summary>Reads the source and starts a call on each element, as fast as the channel takes them.</summary>
@@ -266,7 +256,7 @@ internal static class Concurrent
         }
     }
 
-    /// <summary>Reads the source into the channel the workers take their elements from.</summary>
+    /// <summary>Reads the source into the channel the workers take their elements from, starting a worker when an element needs one.</summary>
     /// <remarks>
     /// The feeder is that channel's only writer and the workers wait on it without a token, as
     /// <see cref="StartAsync"/> writes: one registration for the whole enumeration completes the channel on
@@ -275,7 +265,8 @@ internal static class Concurrent
     private static async Task FeedAsync<T>(
         IAsyncEnumerable<T> source,
         ChannelWriter<T> pending,
-        Stop stop)
+        Stop stop,
+        Action reinforce)
     {
         using var halt = stop.Token.UnsafeRegister(
             static (writer, token) => ((ChannelWriter<T>)writer!).TryComplete(new OperationCanceledException(token)),
@@ -288,6 +279,7 @@ internal static class Concurrent
                 stop.Token.ThrowIfCancellationRequested();
 
                 await pending.WriteAsync(item).ConfigureAwait(false);
+                reinforce();
             }
 
             pending.TryComplete();
@@ -307,14 +299,14 @@ internal static class Concurrent
     /// whole enumeration; a call per element through an async delegate allocated one each time it awaited.
     /// </remarks>
     private static async Task ProjectAsync<T, TResult>(
-        ChannelReader<T> pending,
+        Crew<T> crew,
         ChannelWriter<TResult> results,
         Func<T, CancellationToken, ValueTask<TResult>> selector,
         Stop stop)
     {
         try
         {
-            await foreach (var item in TakeAsync(pending, stop.Token).ConfigureAwait(false))
+            await foreach (var item in crew.TakeAsync(stop.Token).ConfigureAwait(false))
             {
                 var result = await selector(item, stop.Token).ConfigureAwait(false);
 
@@ -330,14 +322,14 @@ internal static class Concurrent
 
     /// <summary>One of the workers of <see cref="Flattened{T, TResult}"/>: expands elements until none are left.</summary>
     private static async Task ExpandAsync<T, TResult>(
-        ChannelReader<T> pending,
+        Crew<T> crew,
         ChannelWriter<TResult> results,
         Func<T, CancellationToken, IAsyncEnumerable<TResult>> selector,
         Stop stop)
     {
         try
         {
-            await foreach (var item in TakeAsync(pending, stop.Token).ConfigureAwait(false))
+            await foreach (var item in crew.TakeAsync(stop.Token).ConfigureAwait(false))
             {
                 var token = stop.Token;
 
@@ -349,27 +341,6 @@ internal static class Concurrent
         {
             await stop.FailAsync(failure).ConfigureAwait(false);
             throw;
-        }
-    }
-
-    /// <summary>Reads the channel to its end, as <c>ReadAllAsync</c> does, waiting on it without a token.</summary>
-    /// <remarks>
-    /// The token is checked before every wait, as a wait handed it would check it; the feeder's registration
-    /// completes the channel on cancellation, which ends a wait already begun.
-    /// </remarks>
-    private static async IAsyncEnumerable<T> TakeAsync<T>(
-        ChannelReader<T> pending,
-        [EnumeratorCancellation] CancellationToken cancellationToken = default)
-    {
-        while (true)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            if (!await pending.WaitToReadAsync().ConfigureAwait(false))
-                yield break;
-
-            while (pending.TryRead(out var item))
-                yield return item;
         }
     }
 
@@ -431,4 +402,54 @@ internal static class Concurrent
 
     /// <summary>An element and what the call on it answered.</summary>
     private readonly record struct Answered<T, TResult>(T Item, TResult Answer);
+
+    /// <summary>The workers of one fan-out, and the channel they take their elements from.</summary>
+    /// <remarks>
+    /// A worker is started when an element has arrived and no worker is waiting for one, until the degree is reached.
+    /// A worker per degree started up front cost 545 bytes each before the first element arrived, for a degree the
+    /// source might never fill, and a degree of <see cref="int.MaxValue"/> sized an array that could not exist, which
+    /// faulted the runner before it could complete the results channel and hung the enumeration.
+    /// </remarks>
+    private sealed class Crew<T>(ChannelReader<T> pending, int degree, Func<Crew<T>, Task> start)
+    {
+        private readonly List<Task> _workers = [];
+        private int _waiting;
+
+        public IReadOnlyList<Task> Workers => _workers;
+
+        /// <summary>Starts a worker when the element just written has no worker waiting for it.</summary>
+        /// <remarks>
+        /// The feeder alone calls this, so the list has one writer. A worker between two elements counts as busy,
+        /// and the spare worker started for it is the price of not tracking them closer, bounded by the degree. The
+        /// start is one delegate for the enumeration: a delegate made per element here cost 57 bytes each.
+        /// </remarks>
+        public void Reinforce()
+        {
+            if (Volatile.Read(ref _waiting) == 0 && _workers.Count < degree)
+                _workers.Add(start(this));
+        }
+
+        /// <summary>Reads the channel to its end from one worker, waiting on it without a token.</summary>
+        /// <remarks>
+        /// The token is checked before every wait, as a wait handed it would check it; the feeder's registration
+        /// completes the channel on cancellation, which ends a wait already begun.
+        /// </remarks>
+        public async IAsyncEnumerable<T> TakeAsync([EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            while (true)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                Interlocked.Increment(ref _waiting);
+                var hasMore = await pending.WaitToReadAsync().ConfigureAwait(false);
+                Interlocked.Decrement(ref _waiting);
+
+                if (!hasMore)
+                    yield break;
+
+                if (pending.TryRead(out var item))
+                    yield return item;
+            }
+        }
+    }
 }
