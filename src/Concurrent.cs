@@ -59,7 +59,7 @@ internal static class Concurrent
         CancellationToken cancellationToken = default) =>
         FanOutAsync<T, TResult>(
             source,
-            (pending, results, work) => ProjectAsync(pending, results, selector, work),
+            (pending, results, stop) => ProjectAsync(pending, results, selector, stop),
             degree,
             cancellationToken);
 
@@ -71,7 +71,7 @@ internal static class Concurrent
         CancellationToken cancellationToken = default) =>
         FanOutAsync<T, TResult>(
             source,
-            (pending, results, work) => ExpandAsync(pending, results, selector, work),
+            (pending, results, stop) => ExpandAsync(pending, results, selector, stop),
             degree,
             cancellationToken);
 
@@ -139,14 +139,14 @@ internal static class Concurrent
 
     private static async IAsyncEnumerable<TResult> FanOutAsync<T, TResult>(
         IAsyncEnumerable<T> source,
-        Func<ChannelReader<T>, ChannelWriter<TResult>, CancellationTokenSource, Task> consume,
+        Func<ChannelReader<T>, ChannelWriter<TResult>, Stop, Task> consume,
         int degree,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         var pending = Channel.CreateBounded<T>(1);
         var results = Channel.CreateBounded<TResult>(degree);
 
-        using var work = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        using var stop = new Stop(cancellationToken);
         var run = RunAsync();
 
         try
@@ -156,7 +156,7 @@ internal static class Concurrent
         }
         finally
         {
-            await work.CancelAsync().ConfigureAwait(false);
+            await stop.CancelAsync().ConfigureAwait(false);
             await ObserveAsync(run).ConfigureAwait(false);
         }
 
@@ -166,9 +166,9 @@ internal static class Concurrent
         {
             var running = new Task[degree + 1];
             for (int i = 0; i < degree; i++)
-                running[i] = consume(pending.Reader, results.Writer, work);
+                running[i] = consume(pending.Reader, results.Writer, stop);
 
-            running[degree] = FeedAsync(source, pending.Writer, work);
+            running[degree] = FeedAsync(source, pending.Writer, stop);
 
             var all = Task.WhenAll(running);
 
@@ -180,7 +180,7 @@ internal static class Concurrent
             }
             catch (Exception)
             {
-                results.Writer.TryComplete(Failure(all));
+                results.Writer.TryComplete(Failure(all, stop.Cause));
             }
         }
     }
@@ -275,17 +275,17 @@ internal static class Concurrent
     private static async Task FeedAsync<T>(
         IAsyncEnumerable<T> source,
         ChannelWriter<T> pending,
-        CancellationTokenSource work)
+        Stop stop)
     {
-        using var stop = work.Token.UnsafeRegister(
+        using var halt = stop.Token.UnsafeRegister(
             static (writer, token) => ((ChannelWriter<T>)writer!).TryComplete(new OperationCanceledException(token)),
             pending);
 
         try
         {
-            await foreach (var item in source.WithCancellation(work.Token).ConfigureAwait(false))
+            await foreach (var item in source.WithCancellation(stop.Token).ConfigureAwait(false))
             {
-                work.Token.ThrowIfCancellationRequested();
+                stop.Token.ThrowIfCancellationRequested();
 
                 await pending.WriteAsync(item).ConfigureAwait(false);
             }
@@ -294,7 +294,7 @@ internal static class Concurrent
         }
         catch (Exception failure)
         {
-            await work.CancelAsync().ConfigureAwait(false);
+            await stop.FailAsync(failure).ConfigureAwait(false);
 
             pending.TryComplete(failure);
             throw;
@@ -310,20 +310,20 @@ internal static class Concurrent
         ChannelReader<T> pending,
         ChannelWriter<TResult> results,
         Func<T, CancellationToken, ValueTask<TResult>> selector,
-        CancellationTokenSource work)
+        Stop stop)
     {
         try
         {
-            await foreach (var item in TakeAsync(pending, work.Token).ConfigureAwait(false))
+            await foreach (var item in TakeAsync(pending, stop.Token).ConfigureAwait(false))
             {
-                var result = await selector(item, work.Token).ConfigureAwait(false);
+                var result = await selector(item, stop.Token).ConfigureAwait(false);
 
-                await results.WriteAsync(result, work.Token).ConfigureAwait(false);
+                await results.WriteAsync(result, stop.Token).ConfigureAwait(false);
             }
         }
-        catch (Exception)
+        catch (Exception failure)
         {
-            await work.CancelAsync().ConfigureAwait(false);
+            await stop.FailAsync(failure).ConfigureAwait(false);
             throw;
         }
     }
@@ -333,21 +333,21 @@ internal static class Concurrent
         ChannelReader<T> pending,
         ChannelWriter<TResult> results,
         Func<T, CancellationToken, IAsyncEnumerable<TResult>> selector,
-        CancellationTokenSource work)
+        Stop stop)
     {
         try
         {
-            await foreach (var item in TakeAsync(pending, work.Token).ConfigureAwait(false))
+            await foreach (var item in TakeAsync(pending, stop.Token).ConfigureAwait(false))
             {
-                var token = work.Token;
+                var token = stop.Token;
 
                 await foreach (var inner in selector(item, token).WithCancellation(token).ConfigureAwait(false))
                     await results.WriteAsync(inner, token).ConfigureAwait(false);
             }
         }
-        catch (Exception)
+        catch (Exception failure)
         {
-            await work.CancelAsync().ConfigureAwait(false);
+            await stop.FailAsync(failure).ConfigureAwait(false);
             throw;
         }
     }
@@ -375,21 +375,23 @@ internal static class Concurrent
 
     /// <summary>Picks the failure worth reporting out of a group that failed together.</summary>
     /// <remarks>
-    /// When one member fails, the others are cancelled deliberately, so their cancellations are
-    /// consequences rather than causes. Reporting one of those would name the wrong culprit and hide
-    /// the exception the caller needs to see.
+    /// The cause is the failure recorded before the stop was ordered, whatever its type: a selector's own timeout is
+    /// a cancellation by type and a cause all the same. The others are cancelled deliberately after it, so their
+    /// cancellations are consequences; any other exception thrown beside the cause is reported with it.
     /// </remarks>
-    internal static Exception Failure(Task completed)
+    internal static Exception Failure(Task completed, Exception? cause)
     {
-        var causes = completed.Exception?.InnerExceptions
-            .Where(failure => failure is not OperationCanceledException)
-            .ToArray() ?? [];
+        var thrown = completed.Exception?.InnerExceptions.AsEnumerable() ?? [];
+        var others = thrown
+            .Where(failure => failure is not OperationCanceledException && failure != cause)
+            .ToArray();
+        Exception[] causes = cause is null ? others : [cause, .. others];
 
         return causes switch
         {
             [] => completed.Exception as Exception ?? new OperationCanceledException(),
             [var only] => only,
-            _ => new AggregateException(causes)
+            _ => new AggregateException(causes),
         };
     }
 

@@ -67,7 +67,8 @@ public static class AsyncPipelineBuilder
     /// <remarks>
     /// Order is not preserved, and it is not stable between runs. The first source to fail faults the
     /// merged sequence and stops the others; if several fail together their exceptions are reported
-    /// as one <see cref="AggregateException"/>.
+    /// as one <see cref="AggregateException"/>. A source's own cancellation — a timeout — is reported as it was
+    /// thrown, not as a cancellation of the merge.
     /// </remarks>
     /// <exception cref="ArgumentNullException"><paramref name="sources"/>, or one of its elements, is null.</exception>
     public static AsyncPipeline<T> Merge<T>(params IAsyncEnumerable<T>[] sources)
@@ -125,8 +126,8 @@ public static class AsyncPipelineBuilder
 
         var merged = Channel.CreateBounded<T>(sources.Length);
 
-        using var work = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        var readers = ReadAllAsync(sources, merged.Writer, work);
+        using var stop = new Stop(cancellationToken);
+        var readers = ReadAllAsync(sources, merged.Writer, stop);
 
         try
         {
@@ -135,7 +136,7 @@ public static class AsyncPipelineBuilder
         }
         finally
         {
-            await work.CancelAsync().ConfigureAwait(false);
+            await stop.CancelAsync().ConfigureAwait(false);
             await Concurrent.ObserveAsync(readers).ConfigureAwait(false);
         }
     }
@@ -143,11 +144,11 @@ public static class AsyncPipelineBuilder
     private static async Task ReadAllAsync<T>(
         IAsyncEnumerable<T>[] sources,
         ChannelWriter<T> merged,
-        CancellationTokenSource work)
+        Stop stop)
     {
         var readers = new Task[sources.Length];
         for (var i = 0; i < sources.Length; i++)
-            readers[i] = ReadAsync(sources[i], merged, work);
+            readers[i] = ReadAsync(sources[i], merged, stop);
 
         var all = Task.WhenAll(readers);
 
@@ -159,23 +160,23 @@ public static class AsyncPipelineBuilder
         }
         catch (Exception)
         {
-            merged.TryComplete(Concurrent.Failure(all));
+            merged.TryComplete(Concurrent.Failure(all, stop.Cause));
         }
     }
 
     private static async Task ReadAsync<T>(
         IAsyncEnumerable<T> source,
         ChannelWriter<T> merged,
-        CancellationTokenSource work)
+        Stop stop)
     {
         try
         {
-            await foreach (var item in source.WithCancellation(work.Token).ConfigureAwait(false))
-                await merged.WriteAsync(item, work.Token).ConfigureAwait(false);
+            await foreach (var item in source.WithCancellation(stop.Token).ConfigureAwait(false))
+                await merged.WriteAsync(item, stop.Token).ConfigureAwait(false);
         }
-        catch (Exception)
+        catch (Exception failure)
         {
-            await work.CancelAsync().ConfigureAwait(false);
+            await stop.FailAsync(failure).ConfigureAwait(false);
             throw;
         }
     }
