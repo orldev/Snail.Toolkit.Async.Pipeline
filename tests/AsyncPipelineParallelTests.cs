@@ -99,8 +99,9 @@ public class AsyncPipelineParallelTests
 
     /// <summary>
     /// A degree of parallelism bounds the results held in memory, not only the calls in flight. With one
-    /// element blocked, a source of ten thousand must stay unread beyond the channel's capacity — the
-    /// earlier semaphore-based version read all ten thousand.
+    /// element blocked, a source of ten thousand must stay unread beyond the channel's capacity and the one
+    /// element the pump holds while it waits for a slot — the earlier semaphore-based version read all ten
+    /// thousand, and the version before this one read two more than the degree.
     /// </summary>
     [Fact]
     public async Task Select_WhenOneElementIsSlow_DoesNotReadWholeSource()
@@ -127,7 +128,7 @@ public class AsyncPipelineParallelTests
         await enumerator.DisposeAsync();
 
         Assert.True(
-            reachedWhileBlocked <= degree * 4,
+            reachedWhileBlocked <= degree + 1,
             $"read {reachedWhileBlocked} of {sourceLength} elements while one result was outstanding");
         return;
 
