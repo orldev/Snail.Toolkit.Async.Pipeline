@@ -43,23 +43,38 @@ The selector takes `(element, CancellationToken)`. Note that `SelectMany` takes 
 
 ### What the degree actually bounds
 
-It bounds the results held in memory, not only the calls in flight. A slow consumer stops the source
-from being read, so an ordered `Select` over an endless source runs in constant memory even when one
-element is slow.
+It bounds the calls in flight exactly, and the results held in memory with them. A slow consumer stops
+the source from being read, so an ordered `Select` over an endless source runs in constant memory even
+when one element is slow. Precisely:
+
+| Operator | Calls at once | Results held | Source read ahead |
+| :--- | :--- | :--- | :--- |
+| `Select`, `Where` | the degree | the degree, counting the one being awaited | one element |
+| `SelectUnordered`, `SelectMany` | the degree | up to twice the degree and one | two elements |
+
+A worker of the unordered operators is started as elements arrive, so a degree far above the source costs
+nothing.
 
 ### What happens when something fails
 
 The first failure faults the sequence and stops the rest. Nothing is dropped silently — if an element's
-selector throws, the consumer sees that exception rather than a quietly shorter result.
+selector throws, the consumer sees that exception rather than a quietly shorter result. A cancellation a
+selector or a source throws on its own, such as an `HttpClient` timeout, is that first failure and is
+reported as it was thrown, not as a cancellation of the pipeline.
 
 ### What happens when you stop reading
 
 Leaving the loop — by `break`, by exception or by cancellation — cancels the pending calls, disposes the
 source and waits for the background work before returning. No work outlives the consumer.
 
+The wait is for the source and the calls to answer their token. One that ignores it — a read on a socket
+without a timeout — holds the return until it answers, because a `MoveNextAsync` in flight cannot be
+abandoned safely.
+
 ## Cancellation
 
-The token is supplied at enumeration and reaches every operator in the chain:
+The token is supplied at enumeration and reaches every operator in the chain, and the exception the
+consumer receives when it fires carries that token, whatever token a selector threw with:
 
 ```csharp
 await foreach (var item in pipeline.WithCancellation(ct))
