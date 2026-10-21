@@ -8,16 +8,16 @@ namespace Snail.Toolkit.Async.Pipeline;
 /// </summary>
 /// <remarks>
 /// <para>
-/// The bound is on results held in memory, not merely on calls in flight. Results travel through a
-/// channel of the requested capacity, so a slow consumer stops the source from being read instead of
-/// letting completed results pile up. A semaphore alone bounds only the calls, which is why the
-/// previous implementation buffered an entire hundred-thousand-element source while honouring a
-/// degree of four.
+/// The bound is on the calls in flight and on the results held in memory, not merely on the calls. Results travel
+/// through a channel of the requested capacity, so a slow consumer stops the source from being read instead of
+/// letting completed results pile up. A semaphore alone bounds only the calls, which is why the previous
+/// implementation buffered an entire hundred-thousand-element source while honouring a degree of four.
 /// </para>
 /// <para>
 /// Enumeration owns the work it starts. Leaving the loop — by break, by exception or by cancellation —
 /// cancels the pending calls, disposes the source and awaits the pump before returning, so no work
-/// outlives the consumer.
+/// outlives the consumer. The wait is for the source and the calls to answer their token: one that ignores it
+/// holds the return until it answers.
 /// </para>
 /// <para>
 /// The first failure wins: it completes the channel, which surfaces it on the consumer's next
@@ -27,30 +27,27 @@ namespace Snail.Toolkit.Async.Pipeline;
 internal static class Concurrent
 {
     /// <summary>Projects each element concurrently and yields the results in source order.</summary>
-    /// <remarks>
-    /// The selector's own <see cref="ValueTask{TResult}"/> travels through the channel and is awaited once, by
-    /// the consumer or by the cleanup. Wrapping each in a <see cref="Task{TResult}"/> cost a task per element
-    /// even when the selector answered at once, and a second state machine when it did not.
-    /// </remarks>
     internal static async IAsyncEnumerable<TResult> OrderedAsync<T, TResult>(
         IAsyncEnumerable<T> source,
         Func<T, CancellationToken, ValueTask<TResult>> selector,
         int degree,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        var started = Channel.CreateBounded<Started<T, TResult>>(degree);
+        await foreach (var answered in AnsweredAsync(source, selector, degree, cancellationToken).ConfigureAwait(false))
+            yield return answered.Answer;
+    }
 
-        using var work = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        var pump = StartAsync(source, selector, started.Writer, work.Token);
-
-        try
+    /// <summary>Tests each element concurrently and yields the matches in source order.</summary>
+    internal static async IAsyncEnumerable<T> FilteredAsync<T>(
+        IAsyncEnumerable<T> source,
+        Func<T, CancellationToken, ValueTask<bool>> predicate,
+        int degree,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        await foreach (var answered in AnsweredAsync(source, predicate, degree, cancellationToken).ConfigureAwait(false))
         {
-            await foreach (var pending in started.Reader.ReadAllAsync(cancellationToken).ConfigureAwait(false))
-                yield return await pending.Answer.ConfigureAwait(false);
-        }
-        finally
-        {
-            await AbandonAsync(started.Reader, pump, work).ConfigureAwait(false);
+            if (answered.Answer)
+                yield return answered.Item;
         }
     }
 
@@ -78,28 +75,60 @@ internal static class Concurrent
             degree,
             cancellationToken);
 
-    /// <summary>Tests each element concurrently and yields the matches in source order.</summary>
+    /// <summary>Starts a call on each element in source order, at most <paramref name="degree"/> at once, and yields each element with its answer.</summary>
     /// <remarks>
-    /// The element travels beside the predicate's own <see cref="ValueTask{TResult}"/>, as a projection's answer
-    /// does: pairing them in an async method cost a state machine per element whenever the predicate awaited.
+    /// <para>
+    /// The element travels beside the selector's own <see cref="ValueTask{TResult}"/>, which is awaited once, by the
+    /// consumer or by the cleanup. Wrapping each in a <see cref="Task{TResult}"/> cost a task per element even when
+    /// the selector answered at once, and a second state machine when it did not.
+    /// </para>
+    /// <para>
+    /// The slot a call takes in the channel stays taken while its answer is awaited, and the pump starts a call only
+    /// once a slot is free, so the degree bounds the calls exactly. Reading the call out before awaiting it, as the
+    /// previous version did, freed the slot early, and with the call the pump had started before waiting for a slot
+    /// a degree of one ran three calls at once.
+    /// </para>
+    /// <para>
+    /// A selector that honours its token throws with the enumeration's linked token when the consumer cancels; the
+    /// consumer is handed its own token instead, which is how a caller tells its cancellation from a timeout inside
+    /// the call.
+    /// </para>
     /// </remarks>
-    internal static async IAsyncEnumerable<T> FilteredAsync<T>(
+    private static async IAsyncEnumerable<Answered<T, TResult>> AnsweredAsync<T, TResult>(
         IAsyncEnumerable<T> source,
-        Func<T, CancellationToken, ValueTask<bool>> predicate,
+        Func<T, CancellationToken, ValueTask<TResult>> selector,
         int degree,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        var started = Channel.CreateBounded<Started<T, bool>>(degree);
+        var started = Channel.CreateBounded<Started<T, TResult>>(degree);
 
         using var work = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        var pump = StartAsync(source, predicate, started.Writer, work.Token);
+        var pump = StartAsync(source, selector, started.Writer, work.Token);
 
         try
         {
-            await foreach (var pending in started.Reader.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+            while (await started.Reader.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
             {
-                if (await pending.Answer.ConfigureAwait(false))
-                    yield return pending.Item;
+                while (started.Reader.TryPeek(out var pending))
+                {
+                    TResult answer;
+
+                    try
+                    {
+                        answer = await pending.Answer.ConfigureAwait(false);
+                    }
+                    catch (OperationCanceledException stopped)
+                        when (cancellationToken.IsCancellationRequested && stopped.CancellationToken != cancellationToken)
+                    {
+                        throw new OperationCanceledException(stopped.Message, stopped, cancellationToken);
+                    }
+                    finally
+                    {
+                        started.Reader.TryRead(out _);
+                    }
+
+                    yield return new Answered<T, TResult>(pending.Item, answer);
+                }
             }
         }
         finally
@@ -158,10 +187,12 @@ internal static class Concurrent
 
     /// <summary>Reads the source and starts a call on each element, as fast as the channel takes them.</summary>
     /// <remarks>
-    /// A write handed a token that can be cancelled allocates its wait every time the channel is full; a write
+    /// A write handed a token that can be cancelled allocates its wait every time the channel is full; a wait
     /// without one reuses the channel's single waiting writer, and the pump is the channel's only writer. One
-    /// registration for the whole enumeration stops it instead: cancellation completes the channel, which fails
-    /// a blocked write at once, as a cancelled token did.
+    /// registration for the whole enumeration stops it instead: cancellation completes the channel, which fails a
+    /// blocked wait at once, as a cancelled token did. The pump waits for a slot before it starts the call, so a call
+    /// is never started that the channel cannot take; the write after a wait fails only when the channel was completed
+    /// in between, and the call started for it is awaited before the pump leaves.
     /// </remarks>
     private static async Task StartAsync<T, TResult>(
         IAsyncEnumerable<T> source,
@@ -178,10 +209,16 @@ internal static class Concurrent
         {
             await foreach (var item in source.WithCancellation(cancellationToken).ConfigureAwait(false))
             {
-                var next = new Started<T, TResult>(item, Invoke(item, selector, cancellationToken));
-                cancellationToken.ThrowIfCancellationRequested();
+                if (!await started.WaitToWriteAsync().ConfigureAwait(false))
+                    break;
 
-                await started.WriteAsync(next).ConfigureAwait(false);
+                var next = new Started<T, TResult>(item, Invoke(item, selector, cancellationToken));
+
+                if (started.TryWrite(next))
+                    continue;
+
+                await ObserveAsync(next.Answer).ConfigureAwait(false);
+                break;
             }
 
             started.TryComplete();
@@ -389,4 +426,7 @@ internal static class Concurrent
 
     /// <summary>An element and the call started on it, travelling together to the consumer.</summary>
     private readonly record struct Started<T, TResult>(T Item, ValueTask<TResult> Answer);
+
+    /// <summary>An element and what the call on it answered.</summary>
+    private readonly record struct Answered<T, TResult>(T Item, TResult Answer);
 }
